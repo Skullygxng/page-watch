@@ -1,5 +1,13 @@
 [
   {
+    "timestamp": "2026-11-10T18:52:43Z",
+    "type": "baseline",
+    "name": "jerseyartists",
+    "url": "https://www.tiktok.com/@jerseyartists",
+    "value": 32,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
     "timestamp": "2026-11-10T18:34:57Z",
     "type": "baseline",
     "name": "roadworks",
