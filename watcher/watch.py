@@ -273,35 +273,109 @@ def number_from_hydration(soup, selector):
     )
 
 
-def watch_number_page(page, entries, config):
-    """number_mode: extract one integer from the page and log the delta.
+RAW = DATA / "raw"
+CONFIRM_DELAY_SECONDS = 90
 
-    Selector rot policy: if extract_number matches nothing, or its text has
-    no parsable number, this raises — the run shows a red X and the log
-    records NOTHING, because a missing number is not zero and a fake drop
-    is worse than silence.
+
+def rounding_unit(value):
+    """The unit a display-rounded counter quantizes to, inferred from the
+    reading itself (its trailing zeros). 77,600,000 -> 100000; 41,208 -> 1.
+    Exact counters therefore can never sit in a boundary zone.
     """
-    name = page["name"]
-    url = page["url"]
-    html = fetch(url, page.get("user_agent"))
+    if value == 0:
+        return 1
+    unit = 1
+    v = value
+    while v % 10 == 0:
+        unit *= 10
+        v //= 10
+    return unit
+
+
+def append_raw(name, record):
+    """The raw history: one line per fetch, appended, never trimmed, no
+    threshold applied. changes.json is a view over this, not the other
+    way around. If you want the willsmith jitter in a month, it is here.
+    """
+    RAW.mkdir(parents=True, exist_ok=True)
+    with open(RAW / f"{name}.jsonl", "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def read_raw_tail(name, n=6):
+    path = RAW / f"{name}.jsonl"
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").strip().splitlines()[-n:]:
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+    return out
+
+
+def fetch_number(page, name):
+    """One fetch -> one extracted integer, with the fallback chain. The
+    caller decides how many times to call this."""
+    html = fetch(page["url"], page.get("user_agent"))
     soup = BeautifulSoup(html, "html.parser")
     for sel in page.get("exclude_selectors", []):
         for el in soup.select(sel):
             el.decompose()
     element = soup.select_one(page["extract_number"])
-    value = None
     if element is not None:
         try:
-            value = parse_number(element.get_text(" ", strip=True))
+            return parse_number(element.get_text(" ", strip=True)), "markup"
         except ValueError:
-            element = None
-    if value is None:
-        value = number_from_hydration(soup, page["extract_number"])
-        print(f"[{name}] markup selector missed — used hydration JSON fallback")
+            pass
+    value = number_from_hydration(soup, page["extract_number"])
+    print(f"[{name}] markup selector missed — used hydration JSON fallback")
+    return value, "hydration"
+
+
+def detect_zone(name, unit):
+    """A page is IN the boundary zone when its recent raw readings include
+    a pair exactly one rounding unit apart — the fingerprint of a true
+    value sitting on a display-rounding edge, where every flip is phantom.
+    """
+    if unit < 100:  # exact or fine-grained counters cannot jitter by a unit
+        return False
+    values = [r.get("value") for r in read_raw_tail(name)
+              if isinstance(r.get("value"), int)]
+    return any(abs(b - a) == unit for a, b in zip(values, values[1:]))
+
+
+def watch_number_page(page, entries, config):
+    """number_mode: extract one integer, record it raw, log the delta.
+
+    Policies, all written down:
+    - Selector rot: nothing matches or nothing parses -> raise. A missing
+      number is not zero; the page fails loudly.
+    - min_delta_pct (default 0.5, per-page overridable): a move must exceed
+      prev_value * pct / 100 to log. It filters the VIEW, never the record.
+    - Above threshold: re-read CONFIRM_DELAY_SECONDS later, inside the same
+      run. THE SECOND READING DECIDES: it becomes `current` and the
+      snapshot; the first reading is kept in the entry (`first_reading`)
+      and in raw. If the second reading reverts below threshold, nothing
+      is logged and both readings live only in raw history.
+    - Boundary zone: recent readings differing by exactly one rounding unit
+      flag the page (entry type "boundary" on enter/leave, warning on the
+      dashboard) so phantom one-unit flips are identifiable up front.
+    """
+    name = page["name"]
+    url = page["url"]
+    min_pct = page.get("min_delta_pct", 0.5)
+
+    # Reading 1 — recorded raw no matter what happens next.
+    value, source = fetch_number(page, name)
+    append_raw(name, {"timestamp": utc_now(), "value": value, "source": source, "reading": 1})
 
     meta_path = SNAPSHOTS / f"{name}.meta.json"
-    meta = {"value": value, "captured": utc_now()}
+    meta = {"value": value, "in_zone": False, "captured": utc_now()}
     if not meta_path.exists():
+        if page.get("simulate"):
+            meta["simulated"] = True
         meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
         entry = {
             "timestamp": utc_now(),
@@ -318,26 +392,78 @@ def watch_number_page(page, entries, config):
         return
 
     prev = json.loads(meta_path.read_text(encoding="utf-8"))
-    if prev.get("value") == value:
-        print(f"[{name}] quiet — {value:,}, no change")
-        return
+    prev_value = prev.get("value", 0)
+    threshold = abs(prev_value) * min_pct / 100.0
+    delta = value - prev_value
+    logged_entry = None
 
-    delta = value - prev["value"]
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    entry = {
-        "timestamp": utc_now(),
-        "type": "number",
-        "name": name,
-        "url": url,
-        "previous": prev["value"],
-        "current": value,
-        "delta": delta,
-    }
-    if page.get("simulate"):
-        entry["simulated"] = True
-        print(f"[{name}] SIMULATED delta — test flag on in config; excluded from dashboard math")
-    entries.insert(0, entry)
-    print(f"[{name}] number moved {prev['value']:,} -> {value:,} ({delta:+,})")
+    if abs(delta) > threshold:
+        # Above threshold: the 90-second confirmation re-read, same run.
+        print(f"[{name}] move {delta:+,} exceeds threshold {threshold:,.0f} "
+              f"({min_pct}% of {prev_value:,}) — re-reading in {CONFIRM_DELAY_SECONDS}s")
+        time.sleep(CONFIRM_DELAY_SECONDS)
+        value2, source2 = fetch_number(page, name)
+        append_raw(name, {"timestamp": utc_now(), "value": value2, "source": source2, "reading": 2})
+
+        # THE SECOND READING DECIDES.
+        if abs(value2 - prev_value) > threshold:
+            delta = value2 - prev_value
+            meta = {"value": value2, "in_zone": prev.get("in_zone", False), "captured": utc_now()}
+            logged_entry = {
+                "timestamp": utc_now(),
+                "type": "number",
+                "name": name,
+                "url": url,
+                "previous": prev_value,
+                "current": value2,
+                "delta": delta,
+                "first_reading": value,
+                "confirmed": value2 == value,
+                "threshold_pct": min_pct,
+            }
+            print(f"[{name}] CONFIRMED: first read {value:,}, second read {value2:,} "
+                  f"vs {prev_value:,} — logged ({delta:+,})")
+        else:
+            print(f"[{name}] first read {value:,}, second read {value2:,} — move NOT "
+                  "confirmed; logged as quiet, both readings kept in raw history")
+            value = value2  # for zone detection only; snapshot unchanged
+    else:
+        print(f"[{name}] quiet — {value:,} (within threshold {threshold:,.0f})")
+
+    # Rounding-boundary zone: entering or leaving is always logged.
+    unit = rounding_unit(value)
+    in_zone = detect_zone(name, unit)
+    zone_changed = in_zone != prev.get("in_zone", False)
+
+    if logged_entry is not None:
+        if page.get("simulate"):
+            logged_entry["simulated"] = True
+            print(f"[{name}] SIMULATED delta — test flag on in config; excluded from dashboard math")
+        entries.insert(0, logged_entry)
+    if zone_changed:
+        # The snapshot only moves when a move is actually logged. On a
+        # quiet run (even with a zone transition), the baseline stays at
+        # the last LOGGED value — sub-threshold drift must accumulate in
+        # raw history until it crosses the threshold, not leak into meta.
+        meta = {
+            "value": logged_entry["current"] if logged_entry else prev_value,
+            "in_zone": in_zone,
+            "captured": utc_now(),
+        }
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        entries.insert(0, {
+            "timestamp": utc_now(),
+            "type": "boundary",
+            "name": name,
+            "url": url,
+            "in_zone": in_zone,
+            "unit": unit,
+            "value": value,
+        })
+        print(f"[{name}] {'ENTERED' if in_zone else 'LEFT'} rounding-boundary zone "
+              f"(unit {unit:,}) — read its column with caution")
+    if logged_entry is not None:
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 def main():
@@ -349,6 +475,7 @@ def main():
 
     SNAPSHOTS.mkdir(parents=True, exist_ok=True)
     ARCHIVE.mkdir(parents=True, exist_ok=True)
+    RAW.mkdir(parents=True, exist_ok=True)
     entries = load_entries()
     before_count = len(entries)
     failures = 0
@@ -365,8 +492,10 @@ def main():
             failures += 1
             print(f"[{page['name']}] ERROR: {exc}")
 
-    # Only rewrite changes.json if something was logged, so a quiet run
-    # leaves the working tree untouched and the workflow commits nothing.
+    # changes.json is rewritten only when something was logged, so a fully
+    # quiet run leaves the DASHBOARD VIEW untouched. Raw history (data/raw/)
+    # is appended every run by design, so the commit-back still happens —
+    # that is the record, not the view.
     if len(entries) != before_count:
         cap = config.get("max_log_entries", 200)
         CHANGES.write_text(json.dumps(entries[:cap], indent=2), encoding="utf-8")

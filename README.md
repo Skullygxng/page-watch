@@ -43,6 +43,32 @@ K/M-abbreviated. If both paths fail, the page still fails. An optional
 per-page `user_agent` overrides the default fetcher UA, which some sites
 need before they serve their server-rendered markup at all.
 
+#### min_delta_pct, raw history, boundary zone, confirmation
+
+- `min_delta_pct` (default 0.5, per-page overridable): a move must exceed
+  `previous × pct / 100` to be logged. The threshold scales with the
+  account it protects — at 32 followers it rounds to nothing, so every
+  move logs; at 77.6M it is ~388K, so a 100K display-rounding flip logs
+  as quiet while a real purge still logs. It filters the *view*, never
+  the record.
+- **Raw history**: every fetch appends a line to `data/raw/<name>.jsonl`
+  — timestamp, exact value, extraction source, reading number. Appended,
+  never trimmed, no threshold applied. `changes.json` and the dashboard
+  are views over that history, not the history itself.
+- **Boundary zone**: the rounding unit is inferred from a reading's
+  trailing zeros (77,600,000 → 100,000; 41,208 → 1). When recent raw
+  readings differ by exactly one unit, the true value is sitting on a
+  display-rounding edge and flips are phantom — the page is flagged with
+  ⚠ on the dashboard, and an entry of type `"boundary"` is logged when
+  it enters or leaves the zone.
+- **Confirmation re-read**: a move above threshold triggers a second
+  fetch 90 seconds later, inside the same run. THE SECOND READING
+  DECIDES: it becomes `current` and the snapshot, and the first reading
+  is preserved in the entry (`first_reading`, `confirmed`) and in raw
+  history. If the second reading reverts below threshold, nothing is
+  logged — both readings live only in raw history. Each fetch writes
+  exactly one raw row, so a confirmed move produces two rows.
+
 A page can carry `"simulate": true` during testing: any delta it logs
 while the flag is set is written with `"simulated": true` on the record
 itself, in `data/changes.json`. The dashboard keeps simulated entries
@@ -58,12 +84,14 @@ matrix calculation, so the math only ever reflects real moves.
 | `requirements.txt` | `requests`, `beautifulsoup4` |
 | `.github/workflows/watch.yml` | Daily cron + manual trigger |
 | `index.html` | Dashboard |
-| `data/changes.json` | Change log (written by the workflow) |
+| `data/changes.json` | Change log — the dashboard's view over raw history |
+| `data/raw/` | Raw history: one line per fetch, never trimmed, no threshold |
 | `data/snapshots/` | Latest + archived snapshots |
 
 ## Notes
 
 - The commit step only ever commits `data/`, and a quiet run leaves the
-  tree untouched, so quiet days produce no commits and no rebuilds.
+  dashboard *view* untouched — but raw history is appended every run by
+  design, so the repo always moves and the schedule never goes inactive.
 - The workflow has a `paths:` filter and a `concurrency` group so its own
   commit-back never re-triggers it and runs never overlap.
