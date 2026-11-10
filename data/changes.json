@@ -1,5 +1,85 @@
 [
   {
+    "timestamp": "2026-11-10T19:05:59Z",
+    "type": "baseline",
+    "name": "jamescharles",
+    "url": "https://www.tiktok.com/@jamescharles",
+    "value": 39200000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:56Z",
+    "type": "baseline",
+    "name": "lorengray",
+    "url": "https://www.tiktok.com/@lorengray",
+    "value": 52700000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:54Z",
+    "type": "baseline",
+    "name": "addison",
+    "url": "https://www.tiktok.com/@addisonre",
+    "value": 87600000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:52Z",
+    "type": "baseline",
+    "name": "daviddobrik",
+    "url": "https://www.tiktok.com/@daviddobrik",
+    "value": 24900000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:49Z",
+    "type": "baseline",
+    "name": "spencerx",
+    "url": "https://www.tiktok.com/@spencerx",
+    "value": 53300000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:47Z",
+    "type": "baseline",
+    "name": "willsmith",
+    "url": "https://www.tiktok.com/@willsmith",
+    "value": 77600000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:45Z",
+    "type": "baseline",
+    "name": "zachking",
+    "url": "https://www.tiktok.com/@zachking",
+    "value": 86700000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:42Z",
+    "type": "baseline",
+    "name": "bella",
+    "url": "https://www.tiktok.com/@bellapoarch",
+    "value": 91400000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:40Z",
+    "type": "baseline",
+    "name": "khaby",
+    "url": "https://www.tiktok.com/@khaby.lame",
+    "value": 162900000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
+    "timestamp": "2026-11-10T19:05:37Z",
+    "type": "baseline",
+    "name": "charli",
+    "url": "https://www.tiktok.com/@charlidamelio",
+    "value": 160300000,
+    "note": "first number captured; future runs log the daily delta"
+  },
+  {
     "timestamp": "2026-11-10T18:52:43Z",
     "type": "baseline",
     "name": "jerseyartists",
