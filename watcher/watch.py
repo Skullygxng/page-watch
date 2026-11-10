@@ -369,3 +369,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+# trigger: manual verification run 2026-11-10
