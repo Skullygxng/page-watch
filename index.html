@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="page-watch">
+  <title>page-watch</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      margin: 0; padding: 1rem;
+      max-width: 42rem; margin-inline: auto;
+      background: light-dark(#fafafa, #111); color: light-dark(#222, #eee);
+    }
+    header h1 { font-size: 1.2rem; margin: 0; }
+    header p { font-size: .8rem; color: gray; margin: .2rem 0 1rem; }
+    .entry {
+      border: 1px solid light-dark(#ddd, #333); border-radius: .5rem;
+      padding: .8rem; margin-bottom: .8rem;
+    }
+    .entry .head { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+    .entry .name { font-weight: 600; }
+    .badge {
+      font-size: .7rem; padding: .1rem .45rem; border-radius: .8rem;
+      background: light-dark(#e8e8e8, #2a2a2a);
+    }
+    .badge.change { background: light-dark(#cfe8cf, #244224); }
+    .badge.baseline { background: light-dark(#d8e4f0, #22303f); }
+    .entry time { font-size: .75rem; color: gray; margin-left: auto; }
+    .counts { font-size: .85rem; margin: .4rem 0; }
+    .counts .add { color: light-dark(#1a7a1a, #6c6); }
+    .counts .rem { color: light-dark(#a11, #c66); }
+    .stamp { font-size: .8rem; color: gray; }
+    details summary { font-size: .8rem; cursor: pointer; color: gray; margin-top: .4rem; }
+    pre {
+      font-size: .75rem; overflow-x: auto; padding: .5rem;
+      background: light-dark(#f0f0f0, #1b1b1b); border-radius: .4rem;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    pre .add { color: light-dark(#1a7a1a, #6c6); }
+    pre .rem { color: light-dark(#a11, #c66); }
+    .link { font-size: .8rem; }
+    footer { font-size: .75rem; color: gray; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>page-watch</h1>
+    <p id="status">loading…</p>
+  </header>
+  <main id="log"></main>
+  <footer>Checked every morning by GitHub Actions. Refreshes itself every 10 minutes.</footer>
+
+  <script>
+    const log = document.getElementById('log');
+    const status = document.getElementById('status');
+
+    function diffHtml(lines) {
+      return lines
+        .map(l => l.startsWith('+') ? `<span class="add">${esc(l)}</span>`
+               : l.startsWith('-') ? `<span class="rem">${esc(l)}</span>`
+               : esc(l))
+        .join('\n');
+    }
+    function esc(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function load() {
+      status.textContent = 'loading…';
+      try {
+        const res = await fetch(`data/changes.json?ts=${Date.now()}`);
+        if (res.status === 404) {
+          status.textContent = 'No log yet — the first run still has to arm the baseline snapshot.';
+          log.innerHTML = '';
+          return;
+        }
+        const entries = await res.json();
+        if (!entries.length) { status.textContent = 'Log is empty.'; return; }
+        status.textContent = `Loaded ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · ${new Date().toLocaleTimeString()}`;
+        log.innerHTML = entries.map(e => `
+          <section class="entry">
+            <div class="head">
+              <span class="name">${esc(e.name)}</span>
+              <span class="badge ${esc(e.type)}">${esc(e.type)}</span>
+              <time>${esc((e.timestamp || '').replace('T', ' ').replace('Z', ' UTC'))}</time>
+            </div>
+            ${e.type === 'change' ? `
+              <div class="counts"><span class="add">+${e.lines_added}</span> <span class="rem">−${e.lines_removed}</span></div>
+              ${e.stamp_changed ? `<div class="stamp">stamp: “${esc(e.stamp_before || 'none')}” → “${esc(e.stamp_after || 'none')}”</div>` : ''}
+              ${(e.diff && e.diff.length) ? `<details><summary>show diff</summary><pre>${diffHtml(e.diff)}</pre></details>` : ''}
+              <a class="link" href="${esc(e.url)}" rel="noopener">open page ↗</a>
+            ` : `<div class="stamp">${esc(e.note || '')}</div>`}
+          </section>`).join('');
+      } catch {
+        status.textContent = 'Could not load the log.';
+      }
+    }
+
+    load();
+    setInterval(load, 10 * 60 * 1000);
+  </script>
+</body>
+</html>

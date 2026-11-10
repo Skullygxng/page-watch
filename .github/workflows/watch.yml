@@ -1,0 +1,53 @@
+name: page-watch
+
+on:
+  schedule:
+    # 07:00 UTC daily = 08:00 UK summer time. Adjust if you want a different
+    # morning. GitHub cron is approximate — it can fire a few minutes late.
+    - cron: "0 7 * * *"
+  workflow_dispatch: # adds a "Run workflow" button for manual tests
+  push:
+    paths:
+      # Belt and braces: the run's own data/ commit-back must never re-trigger
+      # it. (Commits made with the default GITHUB_TOKEN already don't trigger
+      # new runs; this filter guarantees it even if that changes.)
+      - "config.json"
+      - "watcher/**"
+      - "requirements.txt"
+      - ".github/workflows/**"
+
+permissions:
+  contents: write # lets the workflow commit data/ back to the branch
+
+concurrency:
+  group: page-watch
+  cancel-in-progress: false # a manual run queues behind the cron instead of killing it
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Watch pages
+        run: python watcher/watch.py
+
+      - name: Commit changes if any
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Nothing changed — no commit, no Pages rebuild."
+          else
+            git commit -m "watch: changes detected $(date -u +%Y-%m-%d)"
+            git push
+          fi

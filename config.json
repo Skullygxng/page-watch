@@ -1,0 +1,13 @@
+{
+  "pages": [
+    {
+      "name": "roadworks",
+      "url": "https://discover.pbc.gov/pages/roads.aspx",
+      "selector": "",
+      "exclude_selectors": ["aside", "nav", "[class*='popular']", "[id*='popular']"],
+      "enabled": true
+    }
+  ],
+  "max_log_entries": 50,
+  "keep_snapshots": 7
+}
