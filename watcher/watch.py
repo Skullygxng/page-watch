@@ -303,14 +303,17 @@ def watch_number_page(page, entries, config):
     meta = {"value": value, "captured": utc_now()}
     if not meta_path.exists():
         meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-        entries.insert(0, {
+        entry = {
             "timestamp": utc_now(),
             "type": "baseline",
             "name": name,
             "url": url,
             "value": value,
             "note": "first number captured; future runs log the daily delta",
-        })
+        }
+        if page.get("simulate"):
+            entry["simulated"] = True
+        entries.insert(0, entry)
         print(f"[{name}] baseline number captured: {value:,}")
         return
 
@@ -321,7 +324,7 @@ def watch_number_page(page, entries, config):
 
     delta = value - prev["value"]
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    entries.insert(0, {
+    entry = {
         "timestamp": utc_now(),
         "type": "number",
         "name": name,
@@ -329,7 +332,11 @@ def watch_number_page(page, entries, config):
         "previous": prev["value"],
         "current": value,
         "delta": delta,
-    })
+    }
+    if page.get("simulate"):
+        entry["simulated"] = True
+        print(f"[{name}] SIMULATED delta — test flag on in config; excluded from dashboard math")
+    entries.insert(0, entry)
     print(f"[{name}] number moved {prev['value']:,} -> {value:,} ({delta:+,})")
 
 

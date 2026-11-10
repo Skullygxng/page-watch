@@ -43,6 +43,12 @@ K/M-abbreviated. If both paths fail, the page still fails. An optional
 per-page `user_agent` overrides the default fetcher UA, which some sites
 need before they serve their server-rendered markup at all.
 
+A page can carry `"simulate": true` during testing: any delta it logs
+while the flag is set is written with `"simulated": true` on the record
+itself, in `data/changes.json`. The dashboard keeps simulated entries
+visible in their own section but excludes them from every rate and
+matrix calculation, so the math only ever reflects real moves.
+
 ## Files
 
 | Path | Purpose |

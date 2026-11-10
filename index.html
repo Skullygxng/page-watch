@@ -61,12 +61,14 @@
   <main id="log"></main>
   <section id="rates"></section>
   <section id="matrix"></section>
+  <section id="simlog"></section>
   <footer>Checked every morning by GitHub Actions. Refreshes itself every 10 minutes.</footer>
 
   <script>
     const log = document.getElementById('log');
     const rates = document.getElementById('rates');
     const matrix = document.getElementById('matrix');
+    const simlog = document.getElementById('simlog');
     const status = document.getElementById('status');
 
     function esc(s) {
@@ -99,6 +101,7 @@
     function ratesHtml(entries) {
       const byPage = {};
       entries.forEach(e => {
+        if (e.simulated) return;
         const value = (e.current !== undefined) ? e.current : e.value;
         if (value === undefined) return;
         (byPage[e.name] = byPage[e.name] || []).push({
@@ -141,7 +144,7 @@
     function matrixHtml(entries) {
       const pages = {};
       entries.forEach(e => {
-        if (e.type !== 'number' || e.delta === undefined) return;
+        if (e.type !== 'number' || e.delta === undefined || e.simulated) return;
         const d = (e.timestamp || '').slice(0, 10);
         if (!d) return;
         (pages[e.name] = pages[e.name] || {})[d] = e.delta;
@@ -178,6 +181,19 @@
         </section>`;
     }
 
+    function simHtml(entries) {
+      const sims = entries.filter(e => e.simulated);
+      if (!sims.length) return '';
+      return `
+        <section class="entry">
+          <div class="head"><span class="name">simulated test entries</span><span class="badge">test</span></div>
+          <div class="stamp">Logged while a page's simulate flag was on in config.json. Shown here so the record is complete — but excluded from every rate and matrix calculation above. The math only ever sees real moves.</div>
+          ${sims.map(e => `
+            <div class="counts">${esc(e.name)}: ${e.previous.toLocaleString()} → ${e.current.toLocaleString()} (${(e.delta > 0 ? '+' : '') + e.delta.toLocaleString()}) <time>${esc((e.timestamp || '').replace('T', ' ').replace('Z', ' UTC'))}</time></div>
+          `).join('')}
+        </section>`;
+    }
+
     async function load() {
       status.textContent = 'loading…';
       try {
@@ -187,6 +203,7 @@
           log.innerHTML = '';
           rates.innerHTML = '';
           matrix.innerHTML = '';
+          simlog.innerHTML = '';
           return;
         }
         const entries = await res.json();
@@ -197,6 +214,7 @@
         log.innerHTML = textEntries.map(textEntryHtml).join('');
         rates.innerHTML = ratesHtml(numberEntries);
         matrix.innerHTML = matrixHtml(numberEntries);
+        simlog.innerHTML = simHtml(numberEntries);
       } catch {
         status.textContent = 'Could not load the log.';
       }
