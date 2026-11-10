@@ -30,7 +30,10 @@ If the selector matches nothing or the text has no parsable number, the
 page **fails loudly and logs nothing**: a missing number is not zero, and
 a fake drop is worse than silence. The dashboard prints stored values
 with thousands separators and never re-formats to K/M, and shows a
-per-page table of the last 7 days with the average rate of change.
+per-page table of the last 7 days with the average rate of change. The
+dashboard also renders a cross-account matrix: one row per day, one column
+per watched number, and a bottom count of how many accounts dropped that
+day — the row highlights when several accounts drop at once.
 
 If the markup selector misses — some sites serve more than one page
 variant — the extractor falls back to the page's server-injected JSON

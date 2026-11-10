@@ -47,6 +47,9 @@
     th { color: gray; font-weight: 500; }
     td.add { color: light-dark(#1a7a1a, #6c6); }
     td.rem { color: light-dark(#a11, #c66); }
+    .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table.matrix th, table.matrix td { padding: .2rem .4rem; font-size: .7rem; white-space: nowrap; }
+    tr.alarm td { background: light-dark(#fdecec, #3a1d1d); }
     footer { font-size: .75rem; color: gray; margin-top: 1.5rem; }
   </style>
 </head>
@@ -57,11 +60,13 @@
   </header>
   <main id="log"></main>
   <section id="rates"></section>
+  <section id="matrix"></section>
   <footer>Checked every morning by GitHub Actions. Refreshes itself every 10 minutes.</footer>
 
   <script>
     const log = document.getElementById('log');
     const rates = document.getElementById('rates');
+    const matrix = document.getElementById('matrix');
     const status = document.getElementById('status');
 
     function esc(s) {
@@ -133,6 +138,46 @@
       }).join('');
     }
 
+    function matrixHtml(entries) {
+      const pages = {};
+      entries.forEach(e => {
+        if (e.type !== 'number' || e.delta === undefined) return;
+        const d = (e.timestamp || '').slice(0, 10);
+        if (!d) return;
+        (pages[e.name] = pages[e.name] || {})[d] = e.delta;
+      });
+      const names = Object.keys(pages).sort();
+      if (!names.length) return '';
+      const dateSet = new Set();
+      names.forEach(n => Object.keys(pages[n]).forEach(d => dateSet.add(d)));
+      const dates = [...dateSet].sort().reverse().slice(0, 14);
+      const alarmAt = Math.max(2, Math.ceil(names.length / 3));
+      const rows = dates.map(d => {
+        let drops = 0;
+        const cells = names.map(n => {
+          const delta = pages[n][d];
+          if (delta === undefined) return '<td>·</td>';
+          if (delta < 0) drops++;
+          const cls = delta > 0 ? 'add' : delta < 0 ? 'rem' : '';
+          return `<td class="${cls}">${(delta > 0 ? '+' : '') + delta.toLocaleString()}</td>`;
+        }).join('');
+        const alarm = drops >= alarmAt ? ' class="alarm"' : '';
+        return `<tr${alarm}><td>${esc(d)}</td>${cells}<td class="${drops ? 'rem' : ''}">${drops ? drops + ' ↓' : '·'}</td></tr>`;
+      }).join('');
+      const head = names.map(n => `<th>${esc(n)}</th>`).join('');
+      return `
+        <section class="entry">
+          <div class="head"><span class="name">cross-account daily changes</span></div>
+          <div class="scroll">
+            <table class="matrix">
+              <tr><th>date</th>${head}<th>dropped</th></tr>
+              ${rows}
+            </table>
+          </div>
+          <div class="stamp">Row highlights when ${alarmAt}+ accounts drop the same day. · = quiet day for that account.</div>
+        </section>`;
+    }
+
     async function load() {
       status.textContent = 'loading…';
       try {
@@ -141,6 +186,7 @@
           status.textContent = 'No log yet — the first run still has to arm the baseline snapshot.';
           log.innerHTML = '';
           rates.innerHTML = '';
+          matrix.innerHTML = '';
           return;
         }
         const entries = await res.json();
@@ -150,6 +196,7 @@
         const numberEntries = entries.filter(e => e.type === 'number' || e.value !== undefined);
         log.innerHTML = textEntries.map(textEntryHtml).join('');
         rates.innerHTML = ratesHtml(numberEntries);
+        matrix.innerHTML = matrixHtml(numberEntries);
       } catch {
         status.textContent = 'Could not load the log.';
       }

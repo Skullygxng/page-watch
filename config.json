@@ -14,8 +14,88 @@
       "extract_number": "strong[data-e2e='followers-count']",
       "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       "enabled": true
+    },
+    {
+      "name": "charli",
+      "url": "https://www.tiktok.com/@charlidamelio",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "khaby",
+      "url": "https://www.tiktok.com/@khaby.lame",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "bella",
+      "url": "https://www.tiktok.com/@bellapoarch",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "zachking",
+      "url": "https://www.tiktok.com/@zachking",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "willsmith",
+      "url": "https://www.tiktok.com/@willsmith",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "spencerx",
+      "url": "https://www.tiktok.com/@spencerx",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "daviddobrik",
+      "url": "https://www.tiktok.com/@daviddobrik",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "addison",
+      "url": "https://www.tiktok.com/@addisonre",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "lorengray",
+      "url": "https://www.tiktok.com/@lorengray",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
+    },
+    {
+      "name": "jamescharles",
+      "url": "https://www.tiktok.com/@jamescharles",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
     }
   ],
-  "max_log_entries": 50,
+  "max_log_entries": 400,
   "keep_snapshots": 7
 }

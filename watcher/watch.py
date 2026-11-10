@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -345,7 +346,9 @@ def main():
     before_count = len(entries)
     failures = 0
 
-    for page in pages:
+    for index, page in enumerate(pages):
+        if index:
+            time.sleep(2)  # small steady gap between pages — polite to the host, and not a burst
         try:
             if page.get("number_mode"):
                 watch_number_page(page, entries, config)
