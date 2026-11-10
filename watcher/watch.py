@@ -67,10 +67,11 @@ def extract(page, html):
     return root.get_text("\n", strip=True)
 
 
-def fetch(url):
-    headers = {
-        "User-Agent": "council-watcher/1.0 (personal page-change monitor; one fetch per day)"
-    }
+DEFAULT_USER_AGENT = "council-watcher/1.0 (personal page-change monitor; one fetch per day)"
+
+
+def fetch(url, user_agent=None):
+    headers = {"User-Agent": user_agent or DEFAULT_USER_AGENT}
     resp = requests.get(url, headers=headers, timeout=30)
     resp.raise_for_status()
     return resp.text
@@ -173,6 +174,164 @@ def watch_page(page, entries, config):
           + (" (stamp changed)" if stamp_changed and not hash_changed else ""))
 
 
+NUMBER_RE = re.compile(r"([0-9][\d.,]*)\s*([kmb])?", re.IGNORECASE)
+
+
+def parse_number(text):
+    """'41,208' -> 41208; '41.2K' -> 41200; '1.3M' -> 1300000.
+
+    The stored value is an exact integer (int(round(n * multiplier)), so
+    41.2K stores as 41200). The dashboard prints stored values with
+    thousands separators and never re-formats them to K/M — what you read
+    is what was stored.
+
+    Raises ValueError when no number is present. A missing number is not
+    zero: the page fails loudly and nothing is logged.
+    """
+    cleaned = text.replace("\u00a0", " ").strip()
+    match = NUMBER_RE.search(cleaned)
+    if not match:
+        raise ValueError(f"no parsable number in {text[:60]!r}")
+    digits = match.group(1).replace(",", "")
+    suffix = (match.group(2) or "").lower()
+    multiplier = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}.get(suffix, 1)
+    return int(round(float(digits) * multiplier))
+
+
+def _deep_find(obj, key):
+    """First value found at any depth for a dict key, or None."""
+    if isinstance(obj, dict):
+        if key in obj:
+            return obj[key]
+        for v in obj.values():
+            found = _deep_find(v, key)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _deep_find(v, key)
+            if found is not None:
+                return found
+    return None
+
+
+def _deep_find_action_count(obj, action_type):
+    """First userInteractionCount on a schema.org InteractionCounter of the
+    given @type (e.g. FollowAction), at any depth, or None."""
+    if isinstance(obj, dict):
+        if obj.get("@type") == action_type and isinstance(obj.get("userInteractionCount"), int):
+            return obj["userInteractionCount"]
+        for v in obj.values():
+            found = _deep_find_action_count(v, action_type)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _deep_find_action_count(v, action_type)
+            if found is not None:
+                return found
+    return None
+
+
+def number_from_hydration(soup, selector):
+    """Fallback when the markup selector misses.
+
+    Single-page-app sites (TikTok included) inject a JSON hydration blob —
+    script#__UNIVERSAL_DATA_FOR_REHYDRATION__ — that carries the exact
+    integer even when the visible text is K/M-abbreviated or the markup
+    variant changes between loads. If nothing usable is on any known path,
+    this raises: still fail-don't-fake-zero.
+    """
+    script = soup.find("script", id="__UNIVERSAL_DATA_FOR_REHYDRATION__")
+    if script is None:
+        raise ValueError(
+            f"selector {selector!r} matched nothing and no hydration JSON was found — failing, not logging 0"
+        )
+    try:
+        data = json.loads(script.string or script.get_text())
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ValueError(f"hydration JSON failed to parse: {exc}") from exc
+
+    detail = (data.get("__DEFAULT_SCOPE__") or {}).get("webapp.user-detail") or {}
+    user_info = detail.get("userInfo") or {}
+    stats = user_info.get("stats") or {}
+    if isinstance(stats.get("followerCount"), int):
+        return stats["followerCount"]
+    stats_v2 = user_info.get("statsV2") or {}
+    if stats_v2.get("followerCount"):
+        return parse_number(str(stats_v2["followerCount"]))
+    shared = _deep_find(data, "user_state") or {}
+    shared_stats = (shared.get("userInfo") or {}).get("stats") or {}
+    if isinstance(shared_stats.get("followerCount"), int):
+        return shared_stats["followerCount"]
+    count = _deep_find_action_count(data, "FollowAction")
+    if count is not None:
+        return count
+    raise ValueError(
+        "hydration JSON had no follower count on any known path — failing, not logging 0"
+    )
+
+
+def watch_number_page(page, entries, config):
+    """number_mode: extract one integer from the page and log the delta.
+
+    Selector rot policy: if extract_number matches nothing, or its text has
+    no parsable number, this raises — the run shows a red X and the log
+    records NOTHING, because a missing number is not zero and a fake drop
+    is worse than silence.
+    """
+    name = page["name"]
+    url = page["url"]
+    html = fetch(url, page.get("user_agent"))
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in page.get("exclude_selectors", []):
+        for el in soup.select(sel):
+            el.decompose()
+    element = soup.select_one(page["extract_number"])
+    value = None
+    if element is not None:
+        try:
+            value = parse_number(element.get_text(" ", strip=True))
+        except ValueError:
+            element = None
+    if value is None:
+        value = number_from_hydration(soup, page["extract_number"])
+        print(f"[{name}] markup selector missed — used hydration JSON fallback")
+
+    meta_path = SNAPSHOTS / f"{name}.meta.json"
+    meta = {"value": value, "captured": utc_now()}
+    if not meta_path.exists():
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        entries.insert(0, {
+            "timestamp": utc_now(),
+            "type": "baseline",
+            "name": name,
+            "url": url,
+            "value": value,
+            "note": "first number captured; future runs log the daily delta",
+        })
+        print(f"[{name}] baseline number captured: {value:,}")
+        return
+
+    prev = json.loads(meta_path.read_text(encoding="utf-8"))
+    if prev.get("value") == value:
+        print(f"[{name}] quiet — {value:,}, no change")
+        return
+
+    delta = value - prev["value"]
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    entries.insert(0, {
+        "timestamp": utc_now(),
+        "type": "number",
+        "name": name,
+        "url": url,
+        "previous": prev["value"],
+        "current": value,
+        "delta": delta,
+    })
+    print(f"[{name}] number moved {prev['value']:,} -> {value:,} ({delta:+,})")
+
+
 def main():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     pages = [p for p in config.get("pages", []) if p.get("enabled")]
@@ -188,7 +347,10 @@ def main():
 
     for page in pages:
         try:
-            watch_page(page, entries, config)
+            if page.get("number_mode"):
+                watch_number_page(page, entries, config)
+            else:
+                watch_page(page, entries, config)
         except Exception as exc:
             failures += 1
             print(f"[{page['name']}] ERROR: {exc}")

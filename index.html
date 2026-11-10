@@ -42,6 +42,11 @@
     pre .add { color: light-dark(#1a7a1a, #6c6); }
     pre .rem { color: light-dark(#a11, #c66); }
     .link { font-size: .8rem; }
+    table { border-collapse: collapse; font-size: .8rem; margin: .5rem 0; width: 100%; }
+    th, td { text-align: left; padding: .25rem .5rem; border-bottom: 1px solid light-dark(#ddd, #333); }
+    th { color: gray; font-weight: 500; }
+    td.add { color: light-dark(#1a7a1a, #6c6); }
+    td.rem { color: light-dark(#a11, #c66); }
     footer { font-size: .75rem; color: gray; margin-top: 1.5rem; }
   </style>
 </head>
@@ -51,11 +56,17 @@
     <p id="status">loading…</p>
   </header>
   <main id="log"></main>
+  <section id="rates"></section>
   <footer>Checked every morning by GitHub Actions. Refreshes itself every 10 minutes.</footer>
 
   <script>
     const log = document.getElementById('log');
+    const rates = document.getElementById('rates');
     const status = document.getElementById('status');
+
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
 
     function diffHtml(lines) {
       return lines
@@ -64,8 +75,62 @@
                : esc(l))
         .join('\n');
     }
-    function esc(s) {
-      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    function textEntryHtml(e) {
+      return `
+        <section class="entry">
+          <div class="head">
+            <span class="name">${esc(e.name)}</span>
+            <span class="badge ${esc(e.type)}">${esc(e.type)}</span>
+            <time>${esc((e.timestamp || '').replace('T', ' ').replace('Z', ' UTC'))}</time>
+          </div>
+          <div class="counts"><span class="add">+${e.lines_added}</span> <span class="rem">−${e.lines_removed}</span></div>
+          ${e.stamp_changed ? `<div class="stamp">stamp: “${esc(e.stamp_before || 'none')}” → “${esc(e.stamp_after || 'none')}”</div>` : ''}
+          ${(e.diff && e.diff.length) ? `<details><summary>show diff</summary><pre>${diffHtml(e.diff)}</pre></details>` : ''}
+          <a class="link" href="${esc(e.url)}" rel="noopener">open page ↗</a>
+        </section>`;
+    }
+
+    function ratesHtml(entries) {
+      const byPage = {};
+      entries.forEach(e => {
+        const value = (e.current !== undefined) ? e.current : e.value;
+        if (value === undefined) return;
+        (byPage[e.name] = byPage[e.name] || []).push({
+          t: e.timestamp, v: value, delta: e.delta, url: e.url,
+        });
+      });
+      const names = Object.keys(byPage);
+      if (!names.length) return '';
+      return names.map(name => {
+        const points = byPage[name].sort((a, b) => b.t.localeCompare(a.t));
+        const newest = points[0];
+        const last7 = points.slice(0, 7);
+        const deltas = last7.filter(p => p.delta !== undefined).map(p => p.delta);
+        const sum = deltas.reduce((s, d) => s + d, 0);
+        let rateLine = 'no moves logged yet — this is the normal day being measured';
+        if (deltas.length) {
+          const days = Math.max(1, Math.round((Date.parse(newest.t) - Date.parse(last7[last7.length - 1].t)) / 86400000));
+          const rate = Math.round(sum / days);
+          rateLine = `<strong>${rate > 0 ? '+' : ''}${rate.toLocaleString()}</strong> a day over the last ${days} day${days === 1 ? '' : 's'} (${deltas.length} logged move${deltas.length === 1 ? '' : 's'})`;
+        }
+        const rows = last7.map(p => `
+          <tr>
+            <td>${esc(p.t.slice(0, 10))}</td>
+            <td>${p.v.toLocaleString()}</td>
+            <td class="${p.delta > 0 ? 'add' : p.delta < 0 ? 'rem' : ''}">${p.delta !== undefined ? (p.delta > 0 ? '+' : '') + p.delta.toLocaleString() : '—'}</td>
+          </tr>`).join('');
+        return `
+          <section class="entry">
+            <div class="head"><span class="name">${esc(name)} — number watch</span></div>
+            <div class="counts">${rateLine}</div>
+            <table>
+              <tr><th>date</th><th>value</th><th>change</th></tr>
+              ${rows}
+            </table>
+            <a class="link" href="${esc(newest.url)}" rel="noopener">open page ↗</a>
+          </section>`;
+      }).join('');
     }
 
     async function load() {
@@ -75,25 +140,16 @@
         if (res.status === 404) {
           status.textContent = 'No log yet — the first run still has to arm the baseline snapshot.';
           log.innerHTML = '';
+          rates.innerHTML = '';
           return;
         }
         const entries = await res.json();
         if (!entries.length) { status.textContent = 'Log is empty.'; return; }
         status.textContent = `Loaded ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · ${new Date().toLocaleTimeString()}`;
-        log.innerHTML = entries.map(e => `
-          <section class="entry">
-            <div class="head">
-              <span class="name">${esc(e.name)}</span>
-              <span class="badge ${esc(e.type)}">${esc(e.type)}</span>
-              <time>${esc((e.timestamp || '').replace('T', ' ').replace('Z', ' UTC'))}</time>
-            </div>
-            ${e.type === 'change' ? `
-              <div class="counts"><span class="add">+${e.lines_added}</span> <span class="rem">−${e.lines_removed}</span></div>
-              ${e.stamp_changed ? `<div class="stamp">stamp: “${esc(e.stamp_before || 'none')}” → “${esc(e.stamp_after || 'none')}”</div>` : ''}
-              ${(e.diff && e.diff.length) ? `<details><summary>show diff</summary><pre>${diffHtml(e.diff)}</pre></details>` : ''}
-              <a class="link" href="${esc(e.url)}" rel="noopener">open page ↗</a>
-            ` : `<div class="stamp">${esc(e.note || '')}</div>`}
-          </section>`).join('');
+        const textEntries = entries.filter(e => e.type !== 'number' && e.value === undefined);
+        const numberEntries = entries.filter(e => e.type === 'number' || e.value !== undefined);
+        log.innerHTML = textEntries.map(textEntryHtml).join('');
+        rates.innerHTML = ratesHtml(numberEntries);
       } catch {
         status.textContent = 'Could not load the log.';
       }

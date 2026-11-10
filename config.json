@@ -6,6 +6,14 @@
       "selector": "",
       "exclude_selectors": ["aside", "nav", "[class*='popular']", "[id*='popular']"],
       "enabled": true
+    },
+    {
+      "name": "jerseyartists",
+      "url": "https://www.tiktok.com/@jerseyartists",
+      "number_mode": true,
+      "extract_number": "strong[data-e2e='followers-count']",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "enabled": true
     }
   ],
   "max_log_entries": 50,
