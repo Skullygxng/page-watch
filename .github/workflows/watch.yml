@@ -2,9 +2,10 @@ name: page-watch
 
 on:
   schedule:
-    # 07:00 UTC daily = 08:00 UK summer time. Adjust if you want a different
-    # morning. GitHub cron is approximate — it can fire a few minutes late.
-    - cron: "0 7 * * *"
+    # 21:00 UTC daily = ~08:00 local for the account owner (UTC+11).
+    # Adjust if the morning shifts. GitHub cron is approximate — it can
+    # fire a few minutes late.
+    - cron: "0 21 * * *"
   workflow_dispatch: # adds a "Run workflow" button for manual tests
   push:
     paths:
