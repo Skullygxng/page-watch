@@ -1,5 +1,40 @@
 [
   {
+    "timestamp": "2026-11-10T20:14:44Z",
+    "type": "number",
+    "name": "willsmith",
+    "url": "https://www.tiktok.com/@willsmith",
+    "previous": 77700000,
+    "current": 77600000,
+    "delta": -100000
+  },
+  {
+    "timestamp": "2026-11-10T20:14:31Z",
+    "type": "number",
+    "name": "jerseyartists",
+    "url": "https://www.tiktok.com/@jerseyartists",
+    "previous": 30,
+    "current": 32,
+    "delta": 2,
+    "simulated": true
+  },
+  {
+    "timestamp": "2026-11-10T20:14:29Z",
+    "type": "change",
+    "name": "roadworks",
+    "url": "https://discover.pbc.gov/pages/roads.aspx",
+    "hash_changed": true,
+    "stamp_changed": false,
+    "stamp_before": "DATE OF ISSUE: May 30",
+    "stamp_after": "DATE OF ISSUE: May 30",
+    "lines_added": 1,
+    "lines_removed": 1,
+    "diff": [
+      "+Declaring November 2026 as Children and Teens Grief Awareness Month",
+      "-Palm Beach County Daily Activation Update"
+    ]
+  },
+  {
     "timestamp": "2026-11-10T19:53:02Z",
     "type": "number",
     "name": "willsmith",
