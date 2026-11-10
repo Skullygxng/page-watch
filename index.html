@@ -62,6 +62,7 @@
   <section id="rates"></section>
   <section id="matrix"></section>
   <section id="simlog"></section>
+  <section id="engage"></section>
   <footer>Checked every morning by GitHub Actions. Refreshes itself every 10 minutes.</footer>
 
   <script>
@@ -69,6 +70,7 @@
     const rates = document.getElementById('rates');
     const matrix = document.getElementById('matrix');
     const simlog = document.getElementById('simlog');
+    const engage = document.getElementById('engage');
     const status = document.getElementById('status');
 
     function esc(s) {
@@ -209,6 +211,41 @@
         </section>`;
     }
 
+    function engagementHtml(engageEntries) {
+      if (!engageEntries.length) return '';
+      const byPage = {};
+      engageEntries.forEach(e => { (byPage[e.name] = byPage[e.name] || []).push(e); });
+      return Object.keys(byPage).map(name => {
+        const rows = byPage[name].slice(0, 14).map(e => {
+          const ratio = (e.followers && e.hearts !== undefined && e.hearts !== null)
+            ? (e.hearts / e.followers).toFixed(2) : '—';
+          const deltas = [];
+          if (e.hearts_delta !== undefined) deltas.push(`${e.hearts_delta > 0 ? '+' : ''}${e.hearts_delta.toLocaleString()} hearts`);
+          if (e.videos_delta !== undefined) deltas.push(`${e.videos_delta > 0 ? '+' : ''}${e.videos_delta.toLocaleString()} post${e.videos_delta === 1 ? '' : 's'}`);
+          return `
+            <tr>
+              <td>${esc((e.timestamp || '').slice(0, 10))}</td>
+              <td>${e.followers !== undefined && e.followers !== null ? e.followers.toLocaleString() : '—'}</td>
+              <td class="${(e.hearts_delta || 0) > 0 ? 'add' : ''}">${e.hearts !== undefined && e.hearts !== null ? e.hearts.toLocaleString() : '—'}</td>
+              <td>${e.videos !== undefined && e.videos !== null ? e.videos.toLocaleString() : '—'}</td>
+              <td>${ratio}</td>
+              <td class="stamp">${esc(deltas.join(', ') || e.note || '')}</td>
+            </tr>`;
+        }).join('');
+        return `
+          <section class="entry">
+            <div class="head"><span class="name">${esc(name)} — engagement pair</span></div>
+            <div class="stamp">Followers vs. total hearts (likes across all posts) vs. posts. If the first climbs while the second doesn't, the audience is decoration. Hearts per follower is the honesty ratio — organic accounts hold it roughly steady; fed counts run it toward zero.</div>
+            <div class="scroll">
+              <table class="matrix">
+                <tr><th>date</th><th>followers</th><th>hearts</th><th>posts</th><th>hearts/follower</th><th>moves</th></tr>
+                ${rows}
+              </table>
+            </div>
+          </section>`;
+      }).join('');
+    }
+
     async function load() {
       status.textContent = 'loading…';
       try {
@@ -219,18 +256,21 @@
           rates.innerHTML = '';
           matrix.innerHTML = '';
           simlog.innerHTML = '';
+          engage.innerHTML = '';
           return;
         }
         const entries = await res.json();
         if (!entries.length) { status.textContent = 'Log is empty.'; return; }
         status.textContent = `Loaded ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · ${new Date().toLocaleTimeString()}`;
-        const textEntries = entries.filter(e => e.type !== 'number' && e.type !== 'boundary' && e.value === undefined);
+        const textEntries = entries.filter(e => e.type !== 'number' && e.type !== 'boundary' && e.type !== 'engagement' && e.value === undefined);
         const numberEntries = entries.filter(e => e.type === 'number' || e.value !== undefined);
         const boundaryEntries = entries.filter(e => e.type === 'boundary');
+        const engageEntries = entries.filter(e => e.type === 'engagement');
         log.innerHTML = textEntries.map(textEntryHtml).join('');
         rates.innerHTML = ratesHtml(numberEntries, boundaryEntries);
         matrix.innerHTML = matrixHtml(numberEntries, boundaryEntries);
         simlog.innerHTML = simHtml(numberEntries);
+        engage.innerHTML = engagementHtml(engageEntries);
       } catch {
         status.textContent = 'Could not load the log.';
       }

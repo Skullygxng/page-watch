@@ -75,6 +75,21 @@ itself, in `data/changes.json`. The dashboard keeps simulated entries
 visible in their own section but excludes them from every rate and
 matrix calculation, so the math only ever reflects real moves.
 
+#### engagement: the pair
+
+A page with `"engagement": true` also reads total hearts (likes across
+all posts) and post count from the same hydration payload — exact
+integers, no extra fetch. An entry of type `"engagement"` is logged
+whenever hearts or posts move, carrying followers, hearts, posts and
+their deltas; the raw history records the whole stats block every run.
+Per-video views are not obtainable without JavaScript (TikTok renders
+the profile video grid client-side; the SSR payload carries an empty
+itemList even when videoCount > 0) — the raw row records
+`videos_in_payload` for diagnostics. The dashboard's engagement-pair
+table shows followers vs. hearts vs. posts and the hearts-per-follower
+ratio: organic audiences hold that ratio roughly steady; a bought count
+drives it toward zero. That ratio is the audit.
+
 ## Files
 
 | Path | Purpose |

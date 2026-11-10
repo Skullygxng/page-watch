@@ -317,7 +317,9 @@ def read_raw_tail(name, n=6):
 
 def fetch_number(page, name):
     """One fetch -> one extracted integer, with the fallback chain. The
-    caller decides how many times to call this."""
+    caller decides how many times to call this. Also returns the soup so
+    the engagement pass can read the same payload without a second fetch.
+    """
     html = fetch(page["url"], page.get("user_agent"))
     soup = BeautifulSoup(html, "html.parser")
     for sel in page.get("exclude_selectors", []):
@@ -326,12 +328,62 @@ def fetch_number(page, name):
     element = soup.select_one(page["extract_number"])
     if element is not None:
         try:
-            return parse_number(element.get_text(" ", strip=True)), "markup"
+            return parse_number(element.get_text(" ", strip=True)), "markup", soup
         except ValueError:
             pass
     value = number_from_hydration(soup, page["extract_number"])
     print(f"[{name}] markup selector missed — used hydration JSON fallback")
-    return value, "hydration"
+    return value, "hydration", soup
+
+
+def hydration_stats(soup):
+    """Engagement stats from the same hydration blob that carries the
+    follower count: followers, total hearts (likes across all posts) and
+    post count — all exact integers. Per-video views are NOT here: TikTok
+    renders the video grid client-side (SSR itemList is empty even when
+    videoCount > 0), so videos_in_payload is recorded in raw for
+    diagnostics only. Raises when nothing is on any known path — the same
+    fail-loud rule: a missing engagement number is not zero.
+    """
+    script = soup.find("script", id="__UNIVERSAL_DATA_FOR_REHYDRATION__")
+    if script is None:
+        raise ValueError("no hydration JSON found — engagement stats unavailable")
+    try:
+        data = json.loads(script.string or script.get_text())
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ValueError(f"hydration JSON failed to parse: {exc}") from exc
+
+    detail = (data.get("__DEFAULT_SCOPE__") or {}).get("webapp.user-detail") or {}
+    user_info = detail.get("userInfo") or {}
+    stats = user_info.get("stats") or {}
+    stats_v2 = user_info.get("statsV2") or {}
+    shared = _deep_find(data, "user_state") or {}
+    shared_stats = (shared.get("userInfo") or {}).get("stats") or {}
+
+    def pick(int_key, str_key):
+        for src in (stats, shared_stats):
+            v = src.get(int_key)
+            if isinstance(v, int):
+                return v
+        v = stats_v2.get(str_key)
+        if v:
+            return parse_number(str(v))
+        return None
+
+    followers = pick("followerCount", "followerCount")
+    hearts = pick("heartCount", "heartCount")
+    videos = pick("videoCount", "videoCount")
+    if followers is None and hearts is None and videos is None:
+        raise ValueError(
+            "hydration JSON had no engagement stats on any known path — failing, not logging zeros"
+        )
+    item_list = user_info.get("itemList")
+    return {
+        "followers": followers,
+        "hearts": hearts,
+        "videos": videos,
+        "videos_in_payload": len(item_list) if isinstance(item_list, list) else None,
+    }
 
 
 def detect_zone(name, unit):
@@ -367,9 +419,21 @@ def watch_number_page(page, entries, config):
     url = page["url"]
     min_pct = page.get("min_delta_pct", 0.5)
 
-    # Reading 1 — recorded raw no matter what happens next.
-    value, source = fetch_number(page, name)
-    append_raw(name, {"timestamp": utc_now(), "value": value, "source": source, "reading": 1})
+    # Reading 1 — recorded raw no matter what happens next. On engagement
+    # pages the same payload also yields the stats block; if it doesn't,
+    # the reading is still recorded raw, then the page fails loudly.
+    value, source, soup = fetch_number(page, name)
+    raw_record = {"timestamp": utc_now(), "value": value, "source": source, "reading": 1}
+    engage = None
+    if page.get("engagement"):
+        try:
+            engage = hydration_stats(soup)
+            raw_record["stats"] = engage
+        except ValueError as exc:
+            raw_record["stats_error"] = str(exc)
+            append_raw(name, raw_record)
+            raise
+    append_raw(name, raw_record)
 
     meta_path = SNAPSHOTS / f"{name}.meta.json"
     meta = {"value": value, "in_zone": False, "captured": utc_now()}
@@ -402,7 +466,7 @@ def watch_number_page(page, entries, config):
         print(f"[{name}] move {delta:+,} exceeds threshold {threshold:,.0f} "
               f"({min_pct}% of {prev_value:,}) — re-reading in {CONFIRM_DELAY_SECONDS}s")
         time.sleep(CONFIRM_DELAY_SECONDS)
-        value2, source2 = fetch_number(page, name)
+        value2, source2, _soup2 = fetch_number(page, name)
         append_raw(name, {"timestamp": utc_now(), "value": value2, "source": source2, "reading": 2})
 
         # THE SECOND READING DECIDES.
@@ -464,6 +528,45 @@ def watch_number_page(page, entries, config):
               f"(unit {unit:,}) — read its column with caution")
     if logged_entry is not None:
         meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    # Engagement pair: followers vs total hearts vs post count, from the
+    # same payload. Logged whenever hearts or posts move (follower moves
+    # have their own entry); a missing stats block already failed above,
+    # so this branch only ever sees real numbers.
+    if engage is not None:
+        hearts = engage.get("hearts")
+        videos = engage.get("videos")
+        engage_path = SNAPSHOTS / f"{name}.engage.json"
+        prev_engage = None
+        if engage_path.exists():
+            prev_engage = json.loads(engage_path.read_text(encoding="utf-8"))
+        changed = (prev_engage is None
+                   or hearts != prev_engage.get("hearts")
+                   or videos != prev_engage.get("videos"))
+        if changed:
+            entry = {
+                "timestamp": utc_now(),
+                "type": "engagement",
+                "name": name,
+                "url": url,
+                "followers": value,
+                "hearts": hearts,
+                "videos": videos,
+            }
+            if prev_engage is None:
+                entry["note"] = "engagement baseline"
+            else:
+                entry["hearts_delta"] = (hearts or 0) - (prev_engage.get("hearts") or 0)
+                entry["videos_delta"] = (videos or 0) - (prev_engage.get("videos") or 0)
+            if page.get("simulate"):
+                entry["simulated"] = True
+            entries.insert(0, entry)
+            engage_path.write_text(json.dumps(
+                {"hearts": hearts, "videos": videos, "captured": utc_now()},
+                indent=2,
+            ), encoding="utf-8")
+            print(f"[{name}] engagement logged: {value:,} followers, "
+                  f"{hearts:,} hearts, {videos:,} posts")
 
 
 def main():
