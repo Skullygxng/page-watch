@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-11-10T18:34:57Z",
+    "type": "baseline",
+    "name": "roadworks",
+    "url": "https://discover.pbc.gov/pages/roads.aspx",
+    "hash": "9727b4a493da0d9d41870891b5ade194cdb02afecdd30e49e6d83f1dfba0b296",
+    "stamp": "DATE OF ISSUE: May 30",
+    "note": "first snapshot taken; future runs diff against this"
+  }
+]
