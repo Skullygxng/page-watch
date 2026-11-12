@@ -1,5 +1,14 @@
 [
   {
+    "timestamp": "2026-11-12T02:06:12Z",
+    "type": "boundary",
+    "name": "willsmith",
+    "url": "https://www.tiktok.com/@willsmith",
+    "in_zone": true,
+    "unit": 100000,
+    "value": 77600000
+  },
+  {
     "timestamp": "2026-11-10T21:41:50Z",
     "type": "change",
     "name": "roadworks",
