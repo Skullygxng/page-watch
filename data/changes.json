@@ -1,5 +1,33 @@
 [
   {
+    "timestamp": "2026-11-13T01:38:11Z",
+    "type": "change",
+    "name": "roadworks",
+    "url": "https://discover.pbc.gov/pages/roads.aspx",
+    "hash_changed": true,
+    "stamp_changed": false,
+    "stamp_before": "DATE OF ISSUE: May 30",
+    "stamp_after": "DATE OF ISSUE: May 30",
+    "lines_added": 7,
+    "lines_removed": 7,
+    "diff": [
+      "+Declaring November 18, 2026 as GIS Day",
+      "+Declaring November 2026 as National Entrepreneurship Month",
+      "+Declaring November 2026 as Veteran Appreciation Month",
+      "+Recognizing the Wounded Veteran Relief Fund",
+      "+Declaring November 2026 as Alzheimer\u2019s Awareness Month",
+      "+Declaring November 2026 as National Family Caregivers Month",
+      "+Declaring November 2026 as Hunger and Homelessness Awareness Month",
+      "-Palm Beach County Launches Military Trail Business Interruption Grant Program Applications open Thursday, November 12, 2026",
+      "-Governor DeSantis Nominates 15 Palm Beach County Census Tracts for Opportunity Zones 2.0",
+      "-Declaring November 2026 as Palm Beach County Animal Shelter and Foster Caregiver Appreciation Month",
+      "-Declaring November 2026 as Children and Teens Grief Awareness Month",
+      "-Palm Beach County Daily Activation Update",
+      "-Multi-Agency Resource Center Opening in the City of Riviera Beach",
+      "-AISP Learning Community Award Announcement for Criminal Justice Commission"
+    ]
+  },
+  {
     "timestamp": "2026-11-12T02:06:12Z",
     "type": "boundary",
     "name": "willsmith",
