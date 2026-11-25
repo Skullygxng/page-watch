@@ -1,5 +1,21 @@
 [
   {
+    "timestamp": "2026-11-25T03:54:41Z",
+    "type": "change",
+    "name": "roadworks",
+    "url": "https://discover.pbc.gov/pages/roads.aspx",
+    "hash_changed": true,
+    "stamp_changed": false,
+    "stamp_before": "DATE OF ISSUE: May 30",
+    "stamp_after": "DATE OF ISSUE: May 30",
+    "lines_added": 1,
+    "lines_removed": 1,
+    "diff": [
+      "+ILUMINA: A Tropical Garden Lantern Festival at Mounts",
+      "-Declaring November 18, 2026 as GIS Day"
+    ]
+  },
+  {
     "timestamp": "2026-11-24T05:06:52Z",
     "type": "boundary",
     "name": "addison",
